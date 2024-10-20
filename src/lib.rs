@@ -25,8 +25,9 @@
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 pub mod entities;
+pub mod error;
 pub mod utils;
 
 pub mod prelude {
-    pub use crate::{entities::*, utils::*};
+    pub use crate::{entities::*, error::*, utils::*};
 }

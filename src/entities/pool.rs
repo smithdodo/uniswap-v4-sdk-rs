@@ -1,4 +1,4 @@
-use crate::prelude::*;
+use crate::prelude::{Error, *};
 use alloy_primitives::{aliases::U24, keccak256, uint, Address, ChainId, B256, I256, U160};
 use alloy_sol_types::SolValue;
 use uniswap_sdk_core::prelude::*;
@@ -35,15 +35,18 @@ where
 }
 
 impl Pool {
-    fn sort_currency(currency_a: &Currency, currency_b: &Currency) -> (Address, Address) {
+    fn sort_currency(
+        currency_a: &Currency,
+        currency_b: &Currency,
+    ) -> Result<(Address, Address), Error> {
         if currency_a.is_native() {
-            (Address::ZERO, currency_b.address())
+            Ok((Address::ZERO, currency_b.address()))
         } else if currency_b.is_native() {
-            (Address::ZERO, currency_a.address())
-        } else if sorts_before(currency_a, currency_b) {
-            (currency_a.address(), currency_b.address())
+            Ok((Address::ZERO, currency_a.address()))
+        } else if sorts_before(currency_a, currency_b)? {
+            Ok((currency_a.address(), currency_b.address()))
         } else {
-            (currency_b.address(), currency_a.address())
+            Ok((currency_b.address(), currency_a.address()))
         }
     }
 
@@ -53,15 +56,15 @@ impl Pool {
         fee: U24,
         tick_spacing: I,
         hooks: Address,
-    ) -> PoolKey<I> {
-        let (currency0_addr, currency1_addr) = Self::sort_currency(currency_a, currency_b);
-        PoolKey {
+    ) -> Result<PoolKey<I>, Error> {
+        let (currency0_addr, currency1_addr) = Self::sort_currency(currency_a, currency_b)?;
+        Ok(PoolKey {
             currency0: currency0_addr,
             currency1: currency1_addr,
             fee,
             tick_spacing,
             hooks,
-        }
+        })
     }
 
     pub fn get_pool_id<I: TickIndex>(
@@ -70,9 +73,9 @@ impl Pool {
         fee: U24,
         tick_spacing: I,
         hooks: Address,
-    ) -> B256 {
-        let (currency0_addr, currency1_addr) = Self::sort_currency(currency_a, currency_b);
-        keccak256(
+    ) -> Result<B256, Error> {
+        let (currency0_addr, currency1_addr) = Self::sort_currency(currency_a, currency_b)?;
+        Ok(keccak256(
             (
                 currency0_addr,
                 currency1_addr,
@@ -81,7 +84,7 @@ impl Pool {
                 hooks,
             )
                 .abi_encode(),
-        )
+        ))
     }
 
     /// Constructs a pool
@@ -104,7 +107,7 @@ impl Pool {
         hooks: Address,
         sqrt_ratio_x96: U160,
         liquidity: u128,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         Self::new_with_tick_data_provider(
             currency_a,
             currency_b,
@@ -141,25 +144,24 @@ impl<TP: TickDataProvider> Pool<TP> {
         sqrt_ratio_x96: U160,
         liquidity: u128,
         tick_data_provider: TP,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         assert!(fee == DYANMIC_FEE_FLAG || fee < uint!(1_000_000_U24), "FEE");
         if fee == DYANMIC_FEE_FLAG {
             assert_ne!(hooks, Address::ZERO, "Dynamic fee pool requires a hook");
         }
-        let pool_key = Pool::get_pool_key(&currency_a, &currency_b, fee, tick_spacing, hooks);
-        let pool_id = Pool::get_pool_id(&currency_a, &currency_b, fee, tick_spacing, hooks);
+        let pool_key = Pool::get_pool_key(&currency_a, &currency_b, fee, tick_spacing, hooks)?;
+        let pool_id = Pool::get_pool_id(&currency_a, &currency_b, fee, tick_spacing, hooks)?;
         let tick_current = sqrt_ratio_x96
-            .get_tick_at_sqrt_ratio()
-            .unwrap()
+            .get_tick_at_sqrt_ratio()?
             .as_i32()
             .try_into()
             .unwrap();
-        let (currency0, currency1) = if sorts_before(&currency_a, &currency_b) {
+        let (currency0, currency1) = if sorts_before(&currency_a, &currency_b)? {
             (currency_a, currency_b)
         } else {
             (currency_b, currency_a)
         };
-        Self {
+        Ok(Self {
             currency0,
             currency1,
             fee,
@@ -171,7 +173,7 @@ impl<TP: TickDataProvider> Pool<TP> {
             tick_data_provider,
             pool_key,
             pool_id,
-        }
+        })
     }
 
     pub fn token0(&self) -> &Currency {
@@ -261,9 +263,9 @@ impl<TP: TickDataProvider> Pool<TP> {
         zero_for_one: bool,
         amount_specified: I256,
         sqrt_price_limit_x96: Option<U160>,
-    ) -> SwapState<TP::Index> {
+    ) -> Result<SwapState<TP::Index>, Error> {
         if self.non_impactful_hook() {
-            v3_swap(
+            Ok(v3_swap(
                 self.fee,
                 self.sqrt_ratio_x96,
                 self.tick_current,
@@ -273,8 +275,7 @@ impl<TP: TickDataProvider> Pool<TP> {
                 zero_for_one,
                 amount_specified,
                 sqrt_price_limit_x96,
-            )
-            .unwrap()
+            )?)
         } else {
             panic!("Unsupported hook");
         }
@@ -303,7 +304,7 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
         &self,
         input_amount: &CurrencyAmount<impl BaseCurrency>,
         sqrt_price_limit_x96: Option<U160>,
-    ) -> (CurrencyAmount<&Currency>, Self) {
+    ) -> Result<(CurrencyAmount<&Currency>, Self), Error> {
         assert!(self.involves_currency(&input_amount.currency), "CURRENCY");
 
         let zero_for_one = input_amount.currency.equals(&self.currency0);
@@ -318,7 +319,7 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
             zero_for_one,
             I256::from_big_int(input_amount.quotient()),
             sqrt_price_limit_x96,
-        );
+        )?;
 
         if !amount_specified_remaining.is_zero() && sqrt_price_limit_x96.is_none() {
             panic!("Insufficient liquidity");
@@ -329,7 +330,7 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
         } else {
             &self.currency0
         };
-        (
+        Ok((
             CurrencyAmount::from_raw_amount(output_currency, -output_amount.to_big_int()).unwrap(),
             Pool::new_with_tick_data_provider(
                 self.currency0.clone(),
@@ -340,8 +341,8 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
                 sqrt_price_x96,
                 liquidity,
                 self.tick_data_provider.clone(),
-            ),
-        )
+            )?,
+        ))
     }
 
     /// Given a desired output amount of a currency, return the computed input amount and a pool
@@ -363,7 +364,7 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
         &self,
         output_amount: &CurrencyAmount<impl BaseCurrency>,
         sqrt_price_limit_x96: Option<U160>,
-    ) -> (CurrencyAmount<&Currency>, Self) {
+    ) -> Result<(CurrencyAmount<&Currency>, Self), Error> {
         assert!(self.involves_currency(&output_amount.currency), "CURRENCY");
 
         let zero_for_one = output_amount.currency.equals(&self.currency1);
@@ -378,7 +379,7 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
             zero_for_one,
             I256::from_big_int(-output_amount.quotient()),
             sqrt_price_limit_x96,
-        );
+        )?;
 
         if !amount_specified_remaining.is_zero() && sqrt_price_limit_x96.is_none() {
             panic!("Insufficient liquidity");
@@ -389,7 +390,7 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
         } else {
             &self.currency1
         };
-        (
+        Ok((
             CurrencyAmount::from_raw_amount(input_currency, input_amount.to_big_int()).unwrap(),
             Pool::new_with_tick_data_provider(
                 self.currency0.clone(),
@@ -400,7 +401,7 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
                 sqrt_price_x96,
                 liquidity,
                 self.tick_data_provider.clone(),
-            ),
-        )
+            )?,
+        ))
     }
 }
