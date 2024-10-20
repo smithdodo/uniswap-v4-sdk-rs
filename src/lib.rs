@@ -24,8 +24,6 @@
 #![deny(unused_must_use, rust_2018_idioms)]
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
-extern crate alloc;
-
 pub mod entities;
 pub mod utils;
 

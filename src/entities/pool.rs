@@ -1,8 +1,7 @@
 use crate::prelude::*;
-use alloy_primitives::aliases::U24;
-use alloy_primitives::{keccak256, Address, B256, U160};
+use alloy_primitives::{aliases::U24, keccak256, Address, B256, U160};
 use alloy_sol_types::SolValue;
-use uniswap_sdk_core::prelude::{BaseCurrency, Currency as CurrencyTrait};
+use uniswap_sdk_core::prelude::*;
 use uniswap_v3_sdk::prelude::*;
 
 pub const DYANMIC_FEE_FLAG: u32 = 0x800000;
@@ -91,7 +90,8 @@ impl Pool {
     ///
     /// * `currency_a`: One of the currencies in the pool
     /// * `currency_b`: The other currency in the pool
-    /// * `fee`: The fee in hundredths of a bips of the input amount of every swap that is collected by the pool
+    /// * `fee`: The fee in hundredths of a bips of the input amount of every swap that is collected
+    ///   by the pool
     /// * `tick_spacing`: The tickSpacing of the pool
     /// * `hooks`: The address of the hook contract
     /// * `sqrt_ratio_x96`: The sqrt of the current ratio of amounts of currency1 to currency0
@@ -125,7 +125,8 @@ impl<TP: TickDataProvider> Pool<TP> {
     ///
     /// * `currency_a`: One of the currencies in the pool
     /// * `currency_b`: The other currency in the pool
-    /// * `fee`: The fee in hundredths of a bips of the input amount of every swap that is collected by the pool
+    /// * `fee`: The fee in hundredths of a bips of the input amount of every swap that is collected
+    ///   by the pool
     /// * `tick_spacing`: The tickSpacing of the pool
     /// * `hooks`: The address of the hook contract
     /// * `sqrt_ratio_x96`: The sqrt of the current ratio of amounts of currency1 to currency0

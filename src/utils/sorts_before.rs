@@ -1,6 +1,6 @@
 use uniswap_sdk_core::prelude::*;
 
-pub fn sorts_before(currency_a: &impl Currency, currency_b: &impl Currency) -> bool {
+pub fn sorts_before(currency_a: &Currency, currency_b: &Currency) -> bool {
     if currency_a.is_native() {
         return true;
     }
