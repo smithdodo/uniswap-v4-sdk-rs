@@ -20,4 +20,11 @@ pub enum Error {
     /// currencies.
     #[cfg_attr(feature = "std", error("Invalid currency"))]
     InvalidCurrency,
+
+    /// Thrown when trying to simulate a swap with an unsupported hook.
+    #[cfg_attr(feature = "std", error("Unsupported hook"))]
+    UnsupportedHook,
+
+    #[cfg_attr(feature = "std", error("Insufficient liquidity"))]
+    InsufficientLiquidity,
 }

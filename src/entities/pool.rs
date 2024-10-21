@@ -34,6 +34,23 @@ where
     pub pool_id: B256,
 }
 
+impl<TP> PartialEq for Pool<TP>
+where
+    TP: TickDataProvider<Index: PartialEq>,
+{
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.currency0 == other.currency0
+            && self.currency1 == other.currency1
+            && self.fee == other.fee
+            && self.tick_spacing == other.tick_spacing
+            && self.sqrt_ratio_x96 == other.sqrt_ratio_x96
+            && self.hooks == other.hooks
+            && self.liquidity == other.liquidity
+            && self.tick_current == other.tick_current
+    }
+}
+
 impl Pool {
     fn sort_currency(
         currency_a: &Currency,
@@ -50,6 +67,7 @@ impl Pool {
         }
     }
 
+    #[inline]
     pub fn get_pool_key<I: TickIndex>(
         currency_a: &Currency,
         currency_b: &Currency,
@@ -67,6 +85,7 @@ impl Pool {
         })
     }
 
+    #[inline]
     pub fn get_pool_id<I: TickIndex>(
         currency_a: &Currency,
         currency_b: &Currency,
@@ -99,6 +118,7 @@ impl Pool {
     /// * `hooks`: The address of the hook contract
     /// * `sqrt_ratio_x96`: The sqrt of the current ratio of amounts of currency1 to currency0
     /// * `liquidity`: The current value of in range liquidity
+    #[inline]
     pub fn new(
         currency_a: Currency,
         currency_b: Currency,
@@ -135,6 +155,8 @@ impl<TP: TickDataProvider> Pool<TP> {
     /// * `sqrt_ratio_x96`: The sqrt of the current ratio of amounts of currency1 to currency0
     /// * `liquidity`: The current value of in range liquidity
     /// * `tick_data_provider`: A tick data provider that can return tick data
+    #[inline]
+    #[allow(clippy::too_many_arguments)]
     pub fn new_with_tick_data_provider(
         currency_a: Currency,
         currency_b: Currency,
@@ -176,11 +198,13 @@ impl<TP: TickDataProvider> Pool<TP> {
         })
     }
 
-    pub fn token0(&self) -> &Currency {
+    #[inline]
+    pub const fn token0(&self) -> &Currency {
         &self.currency0
     }
 
-    pub fn token1(&self) -> &Currency {
+    #[inline]
+    pub const fn token1(&self) -> &Currency {
         &self.currency1
     }
 
@@ -189,16 +213,19 @@ impl<TP: TickDataProvider> Pool<TP> {
     /// ## Arguments
     ///
     /// * `currency`: The currency to check
+    #[inline]
     pub fn involves_currency(&self, currency: &impl BaseCurrency) -> bool {
         self.currency0.equals(currency) || self.currency1.equals(currency)
     }
 
+    #[inline]
     pub fn involves_token(&self, currency: &impl BaseCurrency) -> bool {
         self.involves_currency(currency)
     }
 
     /// Returns the current mid price of the pool in terms of currency0, i.e. the ratio of currency1
     /// over currency0
+    #[inline]
     pub fn currency0_price(&self) -> Price<Currency, Currency> {
         let sqrt_ratio_x96 = self.sqrt_ratio_x96.to_big_uint();
         Price::new(
@@ -209,12 +236,14 @@ impl<TP: TickDataProvider> Pool<TP> {
         )
     }
 
+    #[inline]
     pub fn token0_price(&self) -> Price<Currency, Currency> {
         self.currency0_price()
     }
 
     /// Returns the current mid price of the pool in terms of currency1, i.e. the ratio of currency0
     /// over currency1
+    #[inline]
     pub fn currency1_price(&self) -> Price<Currency, Currency> {
         let sqrt_ratio_x96 = self.sqrt_ratio_x96.to_big_uint();
         Price::new(
@@ -225,6 +254,7 @@ impl<TP: TickDataProvider> Pool<TP> {
         )
     }
 
+    #[inline]
     pub fn token1_price(&self) -> Price<Currency, Currency> {
         self.currency1_price()
     }
@@ -234,16 +264,22 @@ impl<TP: TickDataProvider> Pool<TP> {
     /// ## Arguments
     ///
     /// * `currency`: The currency to return price of
-    pub fn price_of(&self, currency: &impl BaseCurrency) -> Price<Currency, Currency> {
-        assert!(self.involves_currency(currency), "CURRENCY");
+    #[inline]
+    pub fn price_of(
+        &self,
+        currency: &impl BaseCurrency,
+    ) -> Result<Price<Currency, Currency>, Error> {
         if self.currency0.equals(currency) {
-            self.currency0_price()
+            Ok(self.currency0_price())
+        } else if self.currency1.equals(currency) {
+            Ok(self.currency1_price())
         } else {
-            self.currency1_price()
+            Err(Error::InvalidCurrency)
         }
     }
 
     /// Returns the chain ID of the currencies in the pool.
+    #[inline]
     pub fn chain_id(&self) -> ChainId {
         self.currency0.chain_id()
     }
@@ -277,7 +313,7 @@ impl<TP: TickDataProvider> Pool<TP> {
                 sqrt_price_limit_x96,
             )?)
         } else {
-            panic!("Unsupported hook");
+            Err(Error::UnsupportedHook)
         }
     }
 
@@ -300,12 +336,15 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
     /// * `sqrt_price_limit_x96`: The Q64.96 sqrt price limit
     ///
     /// returns: The output amount and the pool with updated state
+    #[inline]
     pub fn get_output_amount(
         &self,
         input_amount: &CurrencyAmount<impl BaseCurrency>,
         sqrt_price_limit_x96: Option<U160>,
     ) -> Result<(CurrencyAmount<&Currency>, Self), Error> {
-        assert!(self.involves_currency(&input_amount.currency), "CURRENCY");
+        if !self.involves_currency(&input_amount.currency) {
+            return Err(Error::InvalidCurrency);
+        }
 
         let zero_for_one = input_amount.currency.equals(&self.currency0);
 
@@ -322,7 +361,7 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
         )?;
 
         if !amount_specified_remaining.is_zero() && sqrt_price_limit_x96.is_none() {
-            panic!("Insufficient liquidity");
+            return Err(Error::InsufficientLiquidity);
         }
 
         let output_currency = if zero_for_one {
@@ -332,7 +371,7 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
         };
         Ok((
             CurrencyAmount::from_raw_amount(output_currency, -output_amount.to_big_int()).unwrap(),
-            Pool::new_with_tick_data_provider(
+            Self::new_with_tick_data_provider(
                 self.currency0.clone(),
                 self.currency1.clone(),
                 self.fee,
@@ -360,12 +399,15 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
     ///   this value after the swap
     ///
     /// returns: The input amount and the pool with updated state
+    #[inline]
     pub fn get_input_amount(
         &self,
         output_amount: &CurrencyAmount<impl BaseCurrency>,
         sqrt_price_limit_x96: Option<U160>,
     ) -> Result<(CurrencyAmount<&Currency>, Self), Error> {
-        assert!(self.involves_currency(&output_amount.currency), "CURRENCY");
+        if !self.involves_currency(&output_amount.currency) {
+            return Err(Error::InvalidCurrency);
+        }
 
         let zero_for_one = output_amount.currency.equals(&self.currency1);
 
@@ -382,7 +424,7 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
         )?;
 
         if !amount_specified_remaining.is_zero() && sqrt_price_limit_x96.is_none() {
-            panic!("Insufficient liquidity");
+            return Err(Error::InsufficientLiquidity);
         }
 
         let input_currency = if zero_for_one {
@@ -392,7 +434,7 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
         };
         Ok((
             CurrencyAmount::from_raw_amount(input_currency, input_amount.to_big_int()).unwrap(),
-            Pool::new_with_tick_data_provider(
+            Self::new_with_tick_data_provider(
                 self.currency0.clone(),
                 self.currency1.clone(),
                 self.fee,
