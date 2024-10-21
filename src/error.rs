@@ -1,3 +1,6 @@
+#[cfg(doc)]
+use crate::prelude::*;
+
 use derive_more::From;
 use uniswap_sdk_core::error::Error as CoreError;
 use uniswap_v3_sdk::error::Error as V3Error;
@@ -12,4 +15,9 @@ pub enum Error {
     /// Thrown when an error occurs in the v3 library.
     #[cfg_attr(feature = "std", error("{0}"))]
     V3(#[cfg_attr(not(feature = "std"), from)] V3Error),
+
+    /// Thrown when the currency passed to [`get_path_currency`] is not one of the pool's
+    /// currencies.
+    #[cfg_attr(feature = "std", error("Invalid currency"))]
+    InvalidCurrency,
 }
