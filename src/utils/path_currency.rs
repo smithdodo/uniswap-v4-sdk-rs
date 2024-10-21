@@ -8,7 +8,7 @@ pub fn amount_with_path_currency<TP: TickDataProvider>(
     pool: &Pool<TP>,
 ) -> Result<CurrencyAmount<Currency>, Error> {
     Ok(CurrencyAmount::from_fractional_amount(
-        get_path_currency(amount.meta.currency, pool)?,
+        get_path_currency(&amount.currency, pool)?,
         amount.numerator,
         amount.denominator,
     )?)
@@ -16,16 +16,18 @@ pub fn amount_with_path_currency<TP: TickDataProvider>(
 
 #[inline]
 pub fn get_path_currency<TP: TickDataProvider>(
-    currency: Currency,
+    currency: &impl BaseCurrency,
     pool: &Pool<TP>,
 ) -> Result<Currency, Error> {
-    if pool.involves_currency(&currency) {
-        Ok(currency)
+    if pool.currency0.equals(currency) {
+        Ok(pool.currency0.clone())
+    } else if pool.currency1.equals(currency) {
+        Ok(pool.currency1.clone())
     } else if pool.involves_currency(currency.wrapped()) {
         Ok(Currency::Token(currency.wrapped().clone()))
-    } else if pool.currency0.wrapped().equals(&currency) {
+    } else if pool.currency0.wrapped().equals(currency) {
         Ok(pool.currency0.clone())
-    } else if pool.currency1.wrapped().equals(&currency) {
+    } else if pool.currency1.wrapped().equals(currency) {
         Ok(pool.currency1.clone())
     } else {
         Err(Error::InvalidCurrency)
