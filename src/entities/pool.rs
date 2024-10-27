@@ -341,7 +341,7 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
         &self,
         input_amount: &CurrencyAmount<impl BaseCurrency>,
         sqrt_price_limit_x96: Option<U160>,
-    ) -> Result<(CurrencyAmount<&Currency>, Self), Error> {
+    ) -> Result<(CurrencyAmount<Currency>, Self), Error> {
         if !self.involves_currency(&input_amount.currency) {
             return Err(Error::InvalidCurrency);
         }
@@ -365,12 +365,12 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
         }
 
         let output_currency = if zero_for_one {
-            &self.currency1
+            self.currency1.clone()
         } else {
-            &self.currency0
+            self.currency0.clone()
         };
         Ok((
-            CurrencyAmount::from_raw_amount(output_currency, -output_amount.to_big_int()).unwrap(),
+            CurrencyAmount::from_raw_amount(output_currency, -output_amount.to_big_int())?,
             Self::new_with_tick_data_provider(
                 self.currency0.clone(),
                 self.currency1.clone(),
@@ -404,7 +404,7 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
         &self,
         output_amount: &CurrencyAmount<impl BaseCurrency>,
         sqrt_price_limit_x96: Option<U160>,
-    ) -> Result<(CurrencyAmount<&Currency>, Self), Error> {
+    ) -> Result<(CurrencyAmount<Currency>, Self), Error> {
         if !self.involves_currency(&output_amount.currency) {
             return Err(Error::InvalidCurrency);
         }
@@ -428,12 +428,12 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
         }
 
         let input_currency = if zero_for_one {
-            &self.currency0
+            self.currency0.clone()
         } else {
-            &self.currency1
+            self.currency1.clone()
         };
         Ok((
-            CurrencyAmount::from_raw_amount(input_currency, input_amount.to_big_int()).unwrap(),
+            CurrencyAmount::from_raw_amount(input_currency, input_amount.to_big_int())?,
             Self::new_with_tick_data_provider(
                 self.currency0.clone(),
                 self.currency1.clone(),
