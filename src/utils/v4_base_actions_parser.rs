@@ -13,11 +13,9 @@ pub struct V4RouterCall {
 pub fn parse_calldata(calldata: &Bytes) -> Result<V4RouterCall, Error> {
     let ActionsParams { actions, params } =
         ActionsParams::abi_decode(calldata.iter().as_slice(), true)?;
-    let mut res = V4RouterCall {
-        actions: Vec::with_capacity(actions.len()),
-    };
-    for (command, data) in zip(actions, params) {
-        res.actions.push(Actions::abi_decode(command, &data)?);
-    }
-    Ok(res)
+    Ok(V4RouterCall {
+        actions: zip(actions, params)
+            .map(|(command, data)| Actions::abi_decode(command, &data))
+            .collect::<Result<Vec<Actions>, Error>>()?,
+    })
 }
