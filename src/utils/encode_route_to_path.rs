@@ -62,3 +62,179 @@ where
         },
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::*;
+    use alloy_primitives::{aliases::I24, uint};
+    use once_cell::sync::Lazy;
+    use uniswap_sdk_core::token;
+
+    static CURRENCY1: Lazy<Token> =
+        Lazy::new(|| token!(1, "1111111111111111111111111111111111111111", 18, "t1"));
+    static CURRENCY2: Lazy<Token> =
+        Lazy::new(|| token!(1, "2222222222222222222222222222222222222222", 18, "t2"));
+    static CURRENCY3: Lazy<Token> =
+        Lazy::new(|| token!(1, "3333333333333333333333333333333333333333", 18, "t3"));
+    static POOL_ETH_1: Lazy<Pool> = Lazy::new(|| {
+        Pool::new(
+            ETHER.clone().into(),
+            CURRENCY1.clone().into(),
+            FeeAmount::MEDIUM.into(),
+            10,
+            Address::ZERO,
+            encode_sqrt_ratio_x96(1, 1),
+            0,
+        )
+        .unwrap()
+    });
+    static POOL_1_2: Lazy<Pool> = Lazy::new(|| {
+        Pool::new(
+            CURRENCY1.clone().into(),
+            CURRENCY2.clone().into(),
+            FeeAmount::MEDIUM.into(),
+            10,
+            Address::ZERO,
+            encode_sqrt_ratio_x96(1, 1),
+            0,
+        )
+        .unwrap()
+    });
+    static POOL_2_3: Lazy<Pool> = Lazy::new(|| {
+        Pool::new(
+            CURRENCY2.clone().into(),
+            CURRENCY3.clone().into(),
+            FeeAmount::MEDIUM.into(),
+            10,
+            Address::ZERO,
+            encode_sqrt_ratio_x96(1, 1),
+            0,
+        )
+        .unwrap()
+    });
+    static ROUTE: Lazy<Route<Ether, Currency, NoTickDataProvider>> = Lazy::new(|| {
+        Route::new(
+            vec![POOL_ETH_1.clone(), POOL_1_2.clone(), POOL_2_3.clone()],
+            ETHER.clone(),
+            CURRENCY3.clone().into(),
+        )
+        .unwrap()
+    });
+
+    #[test]
+    fn test_encodes_correct_route_for_exact_in() {
+        let expected = vec![
+            PathKey {
+                intermediateCurrency: CURRENCY1.address(),
+                fee: uint!(3000_U256),
+                tickSpacing: I24::unchecked_from(10),
+                hooks: Address::ZERO,
+                hookData: Bytes::default(),
+            },
+            PathKey {
+                intermediateCurrency: CURRENCY2.address(),
+                fee: uint!(3000_U256),
+                tickSpacing: I24::unchecked_from(10),
+                hooks: Address::ZERO,
+                hookData: Bytes::default(),
+            },
+            PathKey {
+                intermediateCurrency: CURRENCY3.address(),
+                fee: uint!(3000_U256),
+                tickSpacing: I24::unchecked_from(10),
+                hooks: Address::ZERO,
+                hookData: Bytes::default(),
+            },
+        ];
+
+        assert_eq!(encode_route_to_path(&ROUTE, false), expected);
+    }
+
+    #[test]
+    fn test_encodes_correct_route_for_exact_out() {
+        let expected = vec![
+            PathKey {
+                intermediateCurrency: Address::ZERO,
+                fee: uint!(3000_U256),
+                tickSpacing: I24::unchecked_from(10),
+                hooks: Address::ZERO,
+                hookData: Bytes::default(),
+            },
+            PathKey {
+                intermediateCurrency: CURRENCY1.address(),
+                fee: uint!(3000_U256),
+                tickSpacing: I24::unchecked_from(10),
+                hooks: Address::ZERO,
+                hookData: Bytes::default(),
+            },
+            PathKey {
+                intermediateCurrency: CURRENCY2.address(),
+                fee: uint!(3000_U256),
+                tickSpacing: I24::unchecked_from(10),
+                hooks: Address::ZERO,
+                hookData: Bytes::default(),
+            },
+        ];
+
+        assert_eq!(encode_route_to_path(&ROUTE, true), expected);
+    }
+
+    #[test]
+    fn test_encodes_correct_path_when_route_has_different_output_than_route_path_output() {
+        let new_route = Route::new(
+            vec![POOL_1_2.clone(), POOL_ETH_1.clone()],
+            CURRENCY2.clone(),
+            WETH.clone(),
+        )
+        .unwrap();
+        let exact_output = true;
+        let expected = vec![
+            PathKey {
+                intermediateCurrency: CURRENCY2.address(),
+                fee: uint!(3000_U256),
+                tickSpacing: I24::unchecked_from(10),
+                hooks: Address::ZERO,
+                hookData: Bytes::default(),
+            },
+            PathKey {
+                intermediateCurrency: CURRENCY1.address(),
+                fee: uint!(3000_U256),
+                tickSpacing: I24::unchecked_from(10),
+                hooks: Address::ZERO,
+                hookData: Bytes::default(),
+            },
+        ];
+
+        assert_eq!(encode_route_to_path(&new_route, exact_output), expected);
+    }
+
+    #[test]
+    fn test_encodes_correct_path_when_route_has_different_input_than_route_path_input() {
+        let new_route = Route::new(
+            vec![POOL_ETH_1.clone(), POOL_1_2.clone()],
+            WETH.clone(),
+            CURRENCY2.clone(),
+        )
+        .unwrap();
+        let exact_output = false;
+        let expected = vec![
+            PathKey {
+                intermediateCurrency: CURRENCY1.address(),
+                fee: uint!(3000_U256),
+                tickSpacing: I24::unchecked_from(10),
+                hooks: Address::ZERO,
+                hookData: Bytes::default(),
+            },
+            PathKey {
+                intermediateCurrency: CURRENCY2.address(),
+                fee: uint!(3000_U256),
+                tickSpacing: I24::unchecked_from(10),
+                hooks: Address::ZERO,
+                hookData: Bytes::default(),
+            },
+        ];
+
+        assert_eq!(encode_route_to_path(&new_route, exact_output), expected);
+    }
+}
