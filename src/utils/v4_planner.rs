@@ -220,7 +220,7 @@ fn currency_address(currency: &impl BaseCurrency) -> Address {
     if currency.is_native() {
         Address::ZERO
     } else {
-        currency.wrapped().address()
+        currency.address()
     }
 }
 

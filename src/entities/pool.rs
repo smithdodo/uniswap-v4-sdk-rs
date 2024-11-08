@@ -16,7 +16,7 @@ where
     pub currency1: Currency,
     pub fee: U24,
     pub tick_spacing: TP::Index,
-    pub sqrt_ratio_x96: U160,
+    pub sqrt_price_x96: U160,
     pub hooks: Address,
     pub liquidity: u128,
     pub tick_current: TP::Index,
@@ -35,7 +35,7 @@ where
             && self.currency1 == other.currency1
             && self.fee == other.fee
             && self.tick_spacing == other.tick_spacing
-            && self.sqrt_ratio_x96 == other.sqrt_ratio_x96
+            && self.sqrt_price_x96 == other.sqrt_price_x96
             && self.hooks == other.hooks
             && self.liquidity == other.liquidity
             && self.tick_current == other.tick_current
@@ -107,7 +107,7 @@ impl Pool {
     ///   by the pool
     /// * `tick_spacing`: The tickSpacing of the pool
     /// * `hooks`: The address of the hook contract
-    /// * `sqrt_ratio_x96`: The sqrt of the current ratio of amounts of currency1 to currency0
+    /// * `sqrt_price_x96`: The sqrt of the current ratio of amounts of currency1 to currency0
     /// * `liquidity`: The current value of in range liquidity
     #[inline]
     pub fn new(
@@ -116,7 +116,7 @@ impl Pool {
         fee: U24,
         tick_spacing: <NoTickDataProvider as TickDataProvider>::Index,
         hooks: Address,
-        sqrt_ratio_x96: U160,
+        sqrt_price_x96: U160,
         liquidity: u128,
     ) -> Result<Self, Error> {
         Self::new_with_tick_data_provider(
@@ -125,7 +125,7 @@ impl Pool {
             fee,
             tick_spacing,
             hooks,
-            sqrt_ratio_x96,
+            sqrt_price_x96,
             liquidity,
             NoTickDataProvider,
         )
@@ -143,7 +143,7 @@ impl<TP: TickDataProvider> Pool<TP> {
     ///   by the pool
     /// * `tick_spacing`: The tickSpacing of the pool
     /// * `hooks`: The address of the hook contract
-    /// * `sqrt_ratio_x96`: The sqrt of the current ratio of amounts of currency1 to currency0
+    /// * `sqrt_price_x96`: The sqrt of the current ratio of amounts of currency1 to currency0
     /// * `liquidity`: The current value of in range liquidity
     /// * `tick_data_provider`: A tick data provider that can return tick data
     #[inline]
@@ -154,7 +154,7 @@ impl<TP: TickDataProvider> Pool<TP> {
         fee: U24,
         tick_spacing: TP::Index,
         hooks: Address,
-        sqrt_ratio_x96: U160,
+        sqrt_price_x96: U160,
         liquidity: u128,
         tick_data_provider: TP,
     ) -> Result<Self, Error> {
@@ -165,11 +165,7 @@ impl<TP: TickDataProvider> Pool<TP> {
         let pool_key =
             Pool::get_pool_key(&currency_a, &currency_b, fee, tick_spacing.to_i24(), hooks)?;
         let pool_id = Pool::get_pool_id(&currency_a, &currency_b, fee, tick_spacing, hooks)?;
-        let tick_current = sqrt_ratio_x96
-            .get_tick_at_sqrt_ratio()?
-            .as_i32()
-            .try_into()
-            .unwrap();
+        let tick_current = TP::Index::from_i24(sqrt_price_x96.get_tick_at_sqrt_ratio()?);
         let (currency0, currency1) = if sorts_before(&currency_a, &currency_b)? {
             (currency_a, currency_b)
         } else {
@@ -180,7 +176,7 @@ impl<TP: TickDataProvider> Pool<TP> {
             currency1,
             fee,
             tick_spacing,
-            sqrt_ratio_x96,
+            sqrt_price_x96,
             hooks,
             liquidity,
             tick_current,
@@ -219,12 +215,12 @@ impl<TP: TickDataProvider> Pool<TP> {
     /// over currency0
     #[inline]
     pub fn currency0_price(&self) -> Price<Currency, Currency> {
-        let sqrt_ratio_x96 = self.sqrt_ratio_x96.to_big_uint();
+        let sqrt_price_x96 = self.sqrt_price_x96.to_big_uint();
         Price::new(
             self.currency0.clone(),
             self.currency1.clone(),
             Q192.to_big_int(),
-            &sqrt_ratio_x96 * &sqrt_ratio_x96,
+            &sqrt_price_x96 * &sqrt_price_x96,
         )
     }
 
@@ -237,11 +233,11 @@ impl<TP: TickDataProvider> Pool<TP> {
     /// over currency1
     #[inline]
     pub fn currency1_price(&self) -> Price<Currency, Currency> {
-        let sqrt_ratio_x96 = self.sqrt_ratio_x96.to_big_uint();
+        let sqrt_price_x96 = self.sqrt_price_x96.to_big_uint();
         Price::new(
             self.currency1.clone(),
             self.currency0.clone(),
-            &sqrt_ratio_x96 * &sqrt_ratio_x96,
+            &sqrt_price_x96 * &sqrt_price_x96,
             Q192.to_big_int(),
         )
     }
@@ -295,7 +291,7 @@ impl<TP: TickDataProvider> Pool<TP> {
         if self.non_impactful_hook() {
             Ok(v3_swap(
                 self.fee,
-                self.sqrt_ratio_x96,
+                self.sqrt_price_x96,
                 self.tick_current,
                 self.liquidity,
                 self.tick_spacing,
@@ -363,16 +359,12 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
         };
         Ok((
             CurrencyAmount::from_raw_amount(output_currency, -output_amount.to_big_int())?,
-            Self::new_with_tick_data_provider(
-                self.currency0.clone(),
-                self.currency1.clone(),
-                self.fee,
-                self.tick_spacing,
-                self.hooks,
+            Self {
                 sqrt_price_x96,
+                tick_current: TP::Index::from_i24(sqrt_price_x96.get_tick_at_sqrt_ratio()?),
                 liquidity,
-                self.tick_data_provider.clone(),
-            )?,
+                ..self.clone()
+            },
         ))
     }
 
@@ -426,16 +418,12 @@ impl<TP: Clone + TickDataProvider> Pool<TP> {
         };
         Ok((
             CurrencyAmount::from_raw_amount(input_currency, input_amount.to_big_int())?,
-            Self::new_with_tick_data_provider(
-                self.currency0.clone(),
-                self.currency1.clone(),
-                self.fee,
-                self.tick_spacing,
-                self.hooks,
+            Self {
                 sqrt_price_x96,
+                tick_current: TP::Index::from_i24(sqrt_price_x96.get_tick_at_sqrt_ratio()?),
                 liquidity,
-                self.tick_data_provider.clone(),
-            )?,
+                ..self.clone()
+            },
         ))
     }
 }
@@ -570,8 +558,8 @@ mod tests {
     #[test]
     fn get_pool_id_returns_correct_pool_id() {
         let result1 = Pool::get_pool_id(
-            &Currency::Token(USDC.clone()),
-            &Currency::Token(DAI.clone()),
+            &USDC.clone().into(),
+            &DAI.clone().into(),
             FeeAmount::LOWEST.into(),
             10,
             Address::ZERO,
@@ -583,8 +571,8 @@ mod tests {
         );
 
         let result2 = Pool::get_pool_id(
-            &Currency::Token(DAI.clone()),
-            &Currency::Token(USDC.clone()),
+            &DAI.clone().into(),
+            &USDC.clone().into(),
             FeeAmount::LOWEST.into(),
             10,
             Address::ZERO,
@@ -596,8 +584,8 @@ mod tests {
     #[test]
     fn get_pool_key_returns_correct_pool_key() {
         let result1 = Pool::get_pool_key(
-            &Currency::Token(USDC.clone()),
-            &Currency::Token(DAI.clone()),
+            &USDC.clone().into(),
+            &DAI.clone().into(),
             FeeAmount::LOWEST.into(),
             10,
             Address::ZERO,
@@ -615,8 +603,8 @@ mod tests {
         );
 
         let result2 = Pool::get_pool_key(
-            &Currency::Token(DAI.clone()),
-            &Currency::Token(USDC.clone()),
+            &DAI.clone().into(),
+            &USDC.clone().into(),
             FeeAmount::LOWEST.into(),
             10,
             Address::ZERO,
@@ -627,14 +615,14 @@ mod tests {
 
     #[test]
     fn currency0_always_is_the_currency_that_sorts_before() {
-        assert_eq!(USDC_DAI.currency0, Currency::Token(DAI.clone()));
-        assert_eq!(DAI_USDC.currency0, Currency::Token(DAI.clone()));
+        assert_eq!(USDC_DAI.currency0, DAI.clone().into());
+        assert_eq!(DAI_USDC.currency0, DAI.clone().into());
     }
 
     #[test]
     fn currency1_always_is_the_currency_that_sorts_after() {
-        assert_eq!(USDC_DAI.currency1, Currency::Token(USDC.clone()));
-        assert_eq!(DAI_USDC.currency1, Currency::Token(USDC.clone()));
+        assert_eq!(USDC_DAI.currency1, USDC.clone().into());
+        assert_eq!(DAI_USDC.currency1, USDC.clone().into());
     }
 
     #[test]
@@ -779,18 +767,7 @@ mod tests {
                 Address::ZERO,
                 encode_sqrt_ratio_x96(1, 1),
                 ONE_ETHER,
-                vec![
-                    Tick {
-                        index: nearest_usable_tick(MIN_TICK_I32, 10),
-                        liquidity_net: ONE_ETHER as i128,
-                        liquidity_gross: ONE_ETHER,
-                    },
-                    Tick {
-                        index: nearest_usable_tick(MAX_TICK_I32, 10),
-                        liquidity_net: -(ONE_ETHER as i128),
-                        liquidity_gross: ONE_ETHER,
-                    },
-                ],
+                TICK_LIST.clone(),
             )
             .unwrap()
         });

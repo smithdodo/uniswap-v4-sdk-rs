@@ -1,7 +1,7 @@
 use crate::entities::Pool;
 use once_cell::sync::Lazy;
 use uniswap_sdk_core::{prelude::*, token};
-use uniswap_v3_sdk::{constants::FeeAmount, prelude::encode_sqrt_ratio_x96};
+use uniswap_v3_sdk::prelude::*;
 
 pub(crate) static ETHER: Lazy<Ether> = Lazy::new(|| Ether::on_chain(1));
 pub(crate) static WETH: Lazy<Token> = Lazy::new(|| ETHER.wrapped().clone());
@@ -26,8 +26,8 @@ pub(crate) static DAI: Lazy<Token> = Lazy::new(|| {
 
 pub(crate) static USDC_DAI: Lazy<Pool> = Lazy::new(|| {
     Pool::new(
-        Currency::Token(USDC.clone()),
-        Currency::Token(DAI.clone()),
+        USDC.clone().into(),
+        DAI.clone().into(),
         FeeAmount::LOWEST.into(),
         10,
         Address::ZERO,
@@ -38,8 +38,8 @@ pub(crate) static USDC_DAI: Lazy<Pool> = Lazy::new(|| {
 });
 pub(crate) static DAI_USDC: Lazy<Pool> = Lazy::new(|| {
     Pool::new(
-        Currency::Token(DAI.clone()),
-        Currency::Token(USDC.clone()),
+        DAI.clone().into(),
+        USDC.clone().into(),
         FeeAmount::LOWEST.into(),
         10,
         Address::ZERO,
@@ -50,3 +50,18 @@ pub(crate) static DAI_USDC: Lazy<Pool> = Lazy::new(|| {
 });
 
 pub(crate) const ONE_ETHER: u128 = 1_000_000_000_000_000_000;
+
+pub(crate) static TICK_LIST: Lazy<Vec<Tick>> = Lazy::new(|| {
+    vec![
+        Tick {
+            index: nearest_usable_tick(MIN_TICK_I32, 10),
+            liquidity_net: ONE_ETHER as i128,
+            liquidity_gross: ONE_ETHER,
+        },
+        Tick {
+            index: nearest_usable_tick(MAX_TICK_I32, 10),
+            liquidity_net: -(ONE_ETHER as i128),
+            liquidity_gross: ONE_ETHER,
+        },
+    ]
+});

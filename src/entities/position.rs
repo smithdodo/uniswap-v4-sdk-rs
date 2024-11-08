@@ -95,7 +95,7 @@ impl<TP: TickDataProvider> Position<TP> {
             CurrencyAmount::from_raw_amount(
                 self.pool.currency0.clone(),
                 get_amount_0_delta(
-                    self.pool.sqrt_ratio_x96,
+                    self.pool.sqrt_price_x96,
                     get_sqrt_ratio_at_tick(self.tick_upper.to_i24())?,
                     self.liquidity,
                     false,
@@ -131,7 +131,7 @@ impl<TP: TickDataProvider> Position<TP> {
                 self.pool.currency1.clone(),
                 get_amount_1_delta(
                     get_sqrt_ratio_at_tick(self.tick_lower.to_i24())?,
-                    self.pool.sqrt_ratio_x96,
+                    self.pool.sqrt_price_x96,
                     self.liquidity,
                     false,
                 )?
@@ -252,7 +252,7 @@ impl<TP: TickDataProvider> Position<TP> {
                 self.pool.fee,
                 self.pool.tick_spacing.to_i24().as_i32(),
                 self.pool.hooks,
-                self.pool.sqrt_ratio_x96,
+                self.pool.sqrt_price_x96,
                 self.pool.liquidity,
             )?,
             self.tick_lower.try_into().unwrap(),
@@ -370,14 +370,14 @@ impl<TP: TickDataProvider> Position<TP> {
         } else if self.pool.tick_current < self.tick_upper {
             MintAmounts {
                 amount0: get_amount_0_delta(
-                    self.pool.sqrt_ratio_x96,
+                    self.pool.sqrt_price_x96,
                     get_sqrt_ratio_at_tick(self.tick_upper.to_i24())?,
                     self.liquidity,
                     true,
                 )?,
                 amount1: get_amount_1_delta(
                     get_sqrt_ratio_at_tick(self.tick_lower.to_i24())?,
-                    self.pool.sqrt_ratio_x96,
+                    self.pool.sqrt_price_x96,
                     self.liquidity,
                     true,
                 )?,
@@ -474,7 +474,7 @@ impl<TP: TickDataProvider> Position<TP> {
         let sqrt_ratio_a_x96 = get_sqrt_ratio_at_tick(tick_lower.to_i24())?;
         let sqrt_ratio_b_x96 = get_sqrt_ratio_at_tick(tick_upper.to_i24())?;
         let liquidity = max_liquidity_for_amounts(
-            pool.sqrt_ratio_x96,
+            pool.sqrt_price_x96,
             sqrt_ratio_a_x96,
             sqrt_ratio_b_x96,
             amount0,
