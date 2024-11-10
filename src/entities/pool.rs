@@ -661,7 +661,7 @@ mod tests {
             )
             .unwrap()
             .currency0_price()
-            .to_significant(5, Rounding::RoundHalfUp)
+            .to_significant(5, None)
             .unwrap(),
             "1.01"
         );
@@ -677,7 +677,7 @@ mod tests {
             )
             .unwrap()
             .currency0_price()
-            .to_significant(5, Rounding::RoundHalfUp)
+            .to_significant(5, None)
             .unwrap(),
             "1.01"
         );
@@ -697,7 +697,7 @@ mod tests {
             )
             .unwrap()
             .currency1_price()
-            .to_significant(5, Rounding::RoundHalfUp)
+            .to_significant(5, None)
             .unwrap(),
             "0.9901"
         );
@@ -713,7 +713,7 @@ mod tests {
             )
             .unwrap()
             .currency1_price()
-            .to_significant(5, Rounding::RoundHalfUp)
+            .to_significant(5, None)
             .unwrap(),
             "0.9901"
         );
