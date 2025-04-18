@@ -225,10 +225,7 @@ fn currency_address(currency: &impl BaseCurrency) -> Address {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        prelude::{Pool, Route},
-        tests::*,
-    };
+    use crate::{currency_amount, prelude::Pool, tests::*};
     use alloy_primitives::hex;
     use once_cell::sync::Lazy;
 
@@ -345,15 +342,11 @@ mod tests {
 
     mod add_trade {
         use super::*;
+        use crate::{create_route, trade_from_route};
 
         #[test]
         fn completes_v4_exact_in_2_hop_swap_same_results_as_add_action() {
-            let route = Route::new(
-                vec![DAI_USDC.clone(), USDC_WETH.clone()],
-                DAI.clone(),
-                WETH.clone(),
-            )
-            .unwrap();
+            let route = create_route!(DAI_USDC, USDC_WETH; DAI, WETH);
 
             // encode with addAction function
             let mut planner = V4Planner::default();
@@ -365,12 +358,11 @@ mod tests {
             }));
 
             // encode with addTrade function
-            let trade = Trade::from_route(
+            let trade = trade_from_route!(
                 route,
-                CurrencyAmount::from_raw_amount(DAI.clone(), ONE_ETHER).unwrap(),
-                TradeType::ExactInput,
-            )
-            .unwrap();
+                currency_amount!(DAI, ONE_ETHER),
+                TradeType::ExactInput
+            );
             let mut trade_planner = V4Planner::default();
             trade_planner.add_trade(&trade, None).unwrap();
 
@@ -385,19 +377,13 @@ mod tests {
 
         #[test]
         fn completes_v4_exact_out_2_hop_swap() {
-            let route = Route::new(
-                vec![DAI_USDC.clone(), USDC_WETH.clone()],
-                DAI.clone(),
-                WETH.clone(),
-            )
-            .unwrap();
+            let route = create_route!(DAI_USDC, USDC_WETH; DAI, WETH);
             let slippage_tolerance = Percent::new(5, 100);
-            let trade = Trade::from_route(
+            let trade = trade_from_route!(
                 route,
-                CurrencyAmount::from_raw_amount(WETH.clone(), ONE_ETHER).unwrap(),
-                TradeType::ExactOutput,
-            )
-            .unwrap();
+                currency_amount!(WETH, ONE_ETHER),
+                TradeType::ExactOutput
+            );
             let mut planner = V4Planner::default();
             planner.add_trade(&trade, Some(slippage_tolerance)).unwrap();
 
@@ -410,19 +396,13 @@ mod tests {
 
         #[test]
         fn completes_v4_exact_out_2_hop_swap_route_path_output_different_than_route_output() {
-            let route = Route::new(
-                vec![DAI_USDC.clone(), USDC_WETH.clone()],
-                DAI.clone(),
-                ETHER.clone(),
-            )
-            .unwrap();
+            let route = create_route!(DAI_USDC, USDC_WETH; DAI, ETHER);
             let slippage_tolerance = Percent::new(5, 100);
-            let trade = Trade::from_route(
+            let trade = trade_from_route!(
                 route,
-                CurrencyAmount::from_raw_amount(ETHER.clone(), ONE_ETHER).unwrap(),
-                TradeType::ExactOutput,
-            )
-            .unwrap();
+                currency_amount!(ETHER, ONE_ETHER),
+                TradeType::ExactOutput
+            );
             let mut planner = V4Planner::default();
             planner.add_trade(&trade, Some(slippage_tolerance)).unwrap();
 
@@ -435,19 +415,13 @@ mod tests {
 
         #[test]
         fn completes_v4_exact_in_2_hop_swap_route_path_input_different_than_route_input() {
-            let route = Route::new(
-                vec![USDC_WETH.clone(), DAI_USDC.clone()],
-                ETHER.clone(),
-                DAI.clone(),
-            )
-            .unwrap();
+            let route = create_route!(USDC_WETH, DAI_USDC; ETHER, DAI);
             let slippage_tolerance = Percent::new(5, 100);
-            let trade = Trade::from_route(
+            let trade = trade_from_route!(
                 route,
-                CurrencyAmount::from_raw_amount(ETHER.clone(), ONE_ETHER).unwrap(),
-                TradeType::ExactInput,
-            )
-            .unwrap();
+                currency_amount!(ETHER, ONE_ETHER),
+                TradeType::ExactInput
+            );
             let mut planner = V4Planner::default();
             planner.add_trade(&trade, Some(slippage_tolerance)).unwrap();
 
@@ -461,18 +435,12 @@ mod tests {
         #[test]
         #[should_panic(expected = "ExactOut requires slippageTolerance")]
         fn throws_error_if_adding_exact_out_trade_without_slippage_tolerance() {
-            let route = Route::new(
-                vec![DAI_USDC.clone(), USDC_WETH.clone()],
-                DAI.clone(),
-                WETH.clone(),
-            )
-            .unwrap();
-            let trade = Trade::from_route(
+            let route = create_route!(DAI_USDC, USDC_WETH; DAI, WETH);
+            let trade = trade_from_route!(
                 route,
-                CurrencyAmount::from_raw_amount(WETH.clone(), ONE_ETHER).unwrap(),
-                TradeType::ExactOutput,
-            )
-            .unwrap();
+                currency_amount!(WETH, ONE_ETHER),
+                TradeType::ExactOutput
+            );
             V4Planner::default().add_trade(&trade, None).unwrap();
         }
 
@@ -482,14 +450,9 @@ mod tests {
         )]
         fn throws_error_if_adding_multiple_swaps_trade() {
             let slippage_tolerance = Percent::new(5, 100);
-            let amount = CurrencyAmount::from_raw_amount(WETH.clone(), 1_000_000_000).unwrap();
-            let route1 = Route::new(
-                vec![DAI_USDC.clone(), USDC_WETH.clone()],
-                DAI.clone(),
-                WETH.clone(),
-            )
-            .unwrap();
-            let route2 = Route::new(vec![DAI_WETH.clone()], DAI.clone(), WETH.clone()).unwrap();
+            let amount = currency_amount!(WETH, 1_000_000_000);
+            let route1 = create_route!(DAI_USDC, USDC_WETH; DAI, WETH);
+            let route2 = create_route!(DAI_WETH, DAI, WETH);
             let trade = Trade::from_routes(
                 vec![(amount.clone(), route1), (amount, route2)],
                 TradeType::ExactOutput,
