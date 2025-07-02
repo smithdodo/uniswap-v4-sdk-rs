@@ -140,7 +140,7 @@ mod extensions {
     use crate::abi::IStateView;
     use alloy::{
         eips::{BlockId, BlockNumberOrTag},
-        providers::{ProviderBuilder, RootProvider},
+        providers::{DynProvider, ProviderBuilder},
         transports::http::reqwest::Url,
     };
 
@@ -149,10 +149,12 @@ mod extensions {
         std::env::var("MAINNET_RPC_URL").unwrap().parse().unwrap()
     });
 
-    pub(crate) static PROVIDER: Lazy<RootProvider> = Lazy::new(|| {
-        ProviderBuilder::new()
-            .disable_recommended_fillers()
-            .connect_http(RPC_URL.clone())
+    pub(crate) static PROVIDER: Lazy<DynProvider> = Lazy::new(|| {
+        DynProvider::new(
+            ProviderBuilder::new()
+                .disable_recommended_fillers()
+                .connect_http(RPC_URL.clone()),
+        )
     });
 
     pub(crate) const BLOCK_ID: Option<BlockId> =
@@ -169,7 +171,7 @@ mod extensions {
         .unwrap()
     });
 
-    pub(crate) static STATE_VIEW: Lazy<IStateView::IStateViewInstance<RootProvider>> =
+    pub(crate) static STATE_VIEW: Lazy<IStateView::IStateViewInstance<DynProvider>> =
         Lazy::new(|| {
             IStateView::new(
                 CHAIN_TO_ADDRESSES_MAP

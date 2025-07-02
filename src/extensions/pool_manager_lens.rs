@@ -7,8 +7,7 @@
 use crate::prelude::{Error, IExtsload};
 use alloy::{
     eips::{BlockId, BlockNumberOrTag},
-    network::{Ethereum, Network},
-    providers::Provider,
+    providers::DynProvider,
     uint,
 };
 use alloy_primitives::{
@@ -49,26 +48,16 @@ fn get_position_info_slot(pool_id: B256, position_id: B256) -> U256 {
 
 /// A lens for querying Uniswap V4 pool manager
 #[derive(Clone, Debug)]
-pub struct PoolManagerLens<P, N = Ethereum>
-where
-    N: Network,
-    P: Provider<N>,
-{
-    pub manager: IExtsload::IExtsloadInstance<P, N>,
-    _network: core::marker::PhantomData<N>,
+pub struct PoolManagerLens {
+    pub manager: IExtsload::IExtsloadInstance<DynProvider>,
 }
 
-impl<P, N> PoolManagerLens<P, N>
-where
-    N: Network,
-    P: Provider<N>,
-{
+impl PoolManagerLens {
     /// Creates a new `PoolManagerLens`
     #[inline]
-    pub const fn new(manager: Address, provider: P) -> Self {
+    pub fn new(manager: Address, provider: DynProvider) -> Self {
         Self {
             manager: IExtsload::new(manager, provider),
-            _network: core::marker::PhantomData,
         }
     }
 
@@ -463,13 +452,13 @@ const fn decode_liquidity(word: B256) -> u128 {
 mod tests {
     use super::*;
     use crate::{prelude::calculate_position_key, tests::*};
-    use alloy::{providers::RootProvider, rpc::types::Filter};
+    use alloy::{providers::Provider, rpc::types::Filter};
     use alloy_sol_types::{sol, SolEvent};
     use once_cell::sync::Lazy;
     use uniswap_sdk_core::addresses::CHAIN_TO_ADDRESSES_MAP;
 
     const TICK_SPACING: i32 = 10;
-    static POOL_MANAGER: Lazy<PoolManagerLens<RootProvider>> = Lazy::new(|| {
+    static POOL_MANAGER: Lazy<PoolManagerLens> = Lazy::new(|| {
         PoolManagerLens::new(
             CHAIN_TO_ADDRESSES_MAP
                 .get(&1)

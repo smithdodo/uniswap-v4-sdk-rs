@@ -3,38 +3,30 @@
 //! using [`PoolManagerLens`].
 
 use crate::prelude::{map_contract_error, PoolManagerLens};
-use alloy::{
-    eips::BlockId,
-    network::{Ethereum, Network},
-    providers::Provider,
-};
+use alloy::{eips::BlockId, providers::DynProvider};
 use alloy_primitives::{aliases::I24, Address, B256, U256};
 use uniswap_v3_sdk::prelude::*;
 
 #[derive(Clone, Debug)]
-pub struct SimpleTickDataProvider<P, N = Ethereum, I = I24>
+pub struct SimpleTickDataProvider<I = I24>
 where
-    P: Provider<N>,
-    N: Network,
     I: TickIndex,
 {
-    pub lens: PoolManagerLens<P, N>,
+    pub lens: PoolManagerLens,
     pub pool_id: B256,
     pub block_id: Option<BlockId>,
     _tick_index: core::marker::PhantomData<I>,
 }
 
-impl<P, N, I> SimpleTickDataProvider<P, N, I>
+impl<I> SimpleTickDataProvider<I>
 where
-    P: Provider<N>,
-    N: Network,
     I: TickIndex,
 {
     #[inline]
-    pub const fn new(
+    pub fn new(
         manager: Address,
         pool_id: B256,
-        provider: P,
+        provider: DynProvider,
         block_id: Option<BlockId>,
     ) -> Self {
         Self {
@@ -58,10 +50,8 @@ where
     }
 }
 
-impl<P, N, I> TickBitMapProvider for SimpleTickDataProvider<P, N, I>
+impl<I> TickBitMapProvider for SimpleTickDataProvider<I>
 where
-    P: Provider<N>,
-    N: Network,
     I: TickIndex,
 {
     type Index = I;
@@ -75,10 +65,8 @@ where
     }
 }
 
-impl<P, N, I> TickDataProvider for SimpleTickDataProvider<P, N, I>
+impl<I> TickDataProvider for SimpleTickDataProvider<I>
 where
-    P: Provider<N>,
-    N: Network,
     I: TickIndex,
 {
     type Index = I;
@@ -119,7 +107,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_v4_simple_tick_data_provider() -> Result<(), Error> {
-        let provider = SimpleTickDataProvider::new(
+        let provider = super::SimpleTickDataProvider::new(
             CHAIN_TO_ADDRESSES_MAP
                 .get(&1)
                 .unwrap()
