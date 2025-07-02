@@ -39,9 +39,9 @@ std = [
     "alloy?/std",
     "thiserror/std",
     "uniswap-sdk-core/std",
-    "uniswap-v3-sdk/std"
+    "uniswap-v3-sdk/std",
 ]
-extensions = [
-    "alloy",
-    "uniswap-v3-sdk/extensions"
-]
+extensions = ["alloy", "uniswap-v3-sdk/extensions"]
+
+[patch.crates-io]
+uniswap-v3-sdk = { git = "https://github.com/smithdodo/uniswap-v3-sdk-rs" }
